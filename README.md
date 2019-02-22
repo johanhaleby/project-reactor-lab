@@ -11,6 +11,8 @@ The purpose is to write a simple chat application to get a feeling for reactive 
 
 ## Instructions
 
+Essentially find all `TODO()`'s in the application and implement them:
+
 1. Store chat messages in capped MongoDB collection
 1. Stream from this collection and publish messages as server-sent events to connected JS clients
 1. Filter out swear words of choice (tip: `"Skånerost"`)
