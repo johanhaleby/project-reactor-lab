@@ -1,5 +1,7 @@
 const chatApplication = (() => {
 
+    const chatTextAreaId = "chat";
+
     function postJson(data) {
         const xhr = new XMLHttpRequest();
         const url = "api/messages";
@@ -10,7 +12,7 @@ const chatApplication = (() => {
                 alert("Failed to post message to the server: " + xhr.status);
             } else {
                 // Scroll down automatically when having published a new message
-                const chat = document.getElementById("chat");
+                const chat = document.getElementById(chatTextAreaId);
                 chat.scrollTop = chat.scrollHeight;
             }
         };
@@ -43,7 +45,7 @@ const chatApplication = (() => {
         source.addEventListener('message', e => {
             const messageJson = JSON.parse(e.data);
             const messageToShow = `[${messageJson.from}] ${messageJson.text}\n`;
-            document.getElementById("chat").innerHTML += messageToShow;
+            document.getElementById(chatTextAreaId).innerHTML += messageToShow;
         }, false);
     }
 
