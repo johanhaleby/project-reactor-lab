@@ -27,12 +27,22 @@ class ChatController(private val chatRepository: ChatRepository) {
 
     @GetMapping
     fun streamMessages(): Flux<ServerSentEvent<HttpMessageDTO>> {
-        return chatRepository.subscribeToMessages()
-                .bufferTimeout(1000, Duration.ofMillis(250))
+        val loading = chatRepository.subscribeToMessages()
+                .bufferTimeout(1000, Duration.ofMillis(500))
                 .map { list ->
                     list.takeLast(10)
                 }
-                .flatMap { list -> list.toFlux() }
+                .limitRequest(1)
+
+        val composed = loading.flatMap { list ->
+            val continuous = chatRepository.subscribeToMessages()
+                    .skipUntil { message -> message.id == list.last().id }
+                    .skip(1)
+
+            Flux.concat(list.toFlux(), continuous)
+        }
+
+        return composed
                 .doOnSubscribe {
                     log.info("Client connected")
                 }
