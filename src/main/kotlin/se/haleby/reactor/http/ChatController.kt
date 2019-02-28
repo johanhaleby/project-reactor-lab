@@ -11,6 +11,7 @@ import se.haleby.reactor.logging.loggerFor
 import se.haleby.reactor.mongo.ChatRepository
 import se.haleby.reactor.sentimentanalyzer.SentenceSentimentAnalyzer
 import se.haleby.reactor.sentimentanalyzer.SentimentAnalysis.*
+import se.haleby.reactor.swearwords.SwearWordObfuscator
 import java.time.Duration
 import javax.validation.Valid
 import javax.validation.constraints.NotBlank
@@ -49,6 +50,7 @@ class ChatController(private val chatRepository: ChatRepository) {
                     log.info("Client connected")
                 }
                 .map(::addSentimentAnalysis)
+                .map(::obfuscateSwearWords)
                 .map(Message::toDTO)
                 .map { message ->
                     ServerSentEvent.builder<HttpMessageDTO>()
@@ -64,6 +66,11 @@ data class HttpMessageDTO(@NotBlank val from: String, @NotBlank val text: String
 
 private fun HttpMessageDTO.toDomain() = Message(from, text)
 private fun Message.toDTO() = HttpMessageDTO(from, text, id)
+
+private fun obfuscateSwearWords(message: Message): Message {
+    val messageWithObfuscatedSwearWords = SwearWordObfuscator.obfuscateSwearWords(message.text)
+    return message.copy(text = messageWithObfuscatedSwearWords)
+}
 
 private fun addSentimentAnalysis(message: Message): Message {
     val result = SentenceSentimentAnalyzer.analyze(message.text)

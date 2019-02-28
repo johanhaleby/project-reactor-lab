@@ -1,8 +1,14 @@
 package se.haleby.reactor.swearwords
 
-//
-//val swearWords = arrayOf("Skånerost", "bar", "spam").joinToString(prefix = "(?i)", separator = "|").toRegex()
-//
-//fun replaceSwearWordsWithAsterisk(str: String) {
-//    swearWords.findAll(str).forEach { result.add(it.value) }
-//}
+object SwearWordObfuscator {
+    private val swearWords = setOf("skånerost", "fulkaffe", "mörkrost")
+
+    fun obfuscateSwearWords(message: String): String =
+            message.splitToSequence(" ").map { word: String ->
+                if (swearWords.contains(word.toLowerCase())) {
+                    (0..word.length).joinToString(separator = "*") { "" }
+                } else {
+                    word
+                }
+            }.joinToString(" ")
+}
