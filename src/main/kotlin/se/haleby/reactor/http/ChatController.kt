@@ -9,6 +9,8 @@ import reactor.core.publisher.toFlux
 import se.haleby.reactor.Message
 import se.haleby.reactor.logging.loggerFor
 import se.haleby.reactor.mongo.ChatRepository
+import se.haleby.reactor.sentimentanalyzer.SentenceSentimentAnalyzer
+import se.haleby.reactor.sentimentanalyzer.SentimentAnalysis.*
 import java.time.Duration
 import javax.validation.Valid
 import javax.validation.constraints.NotBlank
@@ -46,6 +48,7 @@ class ChatController(private val chatRepository: ChatRepository) {
                 .doOnSubscribe {
                     log.info("Client connected")
                 }
+                .map(::addSentimentAnalysis)
                 .map(Message::toDTO)
                 .map { message ->
                     ServerSentEvent.builder<HttpMessageDTO>()
@@ -61,3 +64,13 @@ data class HttpMessageDTO(@NotBlank val from: String, @NotBlank val text: String
 
 private fun HttpMessageDTO.toDomain() = Message(from, text)
 private fun Message.toDTO() = HttpMessageDTO(from, text, id)
+
+private fun addSentimentAnalysis(message: Message): Message {
+    val result = SentenceSentimentAnalyzer.analyze(message.text)
+    val simley = when (result) {
+        POSITIVE -> "\uD83D\uDE03"
+        NEGATIVE -> "\uD83D\uDE41"
+        NEUTRAL -> "\uD83D\uDE10"
+    }
+    return message.copy(text = message.text + " —[$simley]—")
+}
