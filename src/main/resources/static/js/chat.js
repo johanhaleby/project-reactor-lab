@@ -47,6 +47,10 @@ const chatApplication = (() => {
             const messageToShow = `[${messageJson.from}] ${messageJson.text}\n`;
             document.getElementById(chatTextAreaId).innerHTML += messageToShow;
         }, false);
+
+        source.addEventListener('sentiment', e => {
+            document.getElementById("sentiment").innerHTML = `Chat happiness is: ${e.data}`;
+        }, false);
     }
 
     function start() {

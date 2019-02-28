@@ -10,9 +10,12 @@ import se.haleby.reactor.Message
 import se.haleby.reactor.logging.loggerFor
 import se.haleby.reactor.mongo.ChatRepository
 import se.haleby.reactor.sentimentanalyzer.SentenceSentimentAnalyzer
+import se.haleby.reactor.sentimentanalyzer.SentimentAnalysis
 import se.haleby.reactor.sentimentanalyzer.SentimentAnalysis.*
+import se.haleby.reactor.sentimentanalyzer.SystemSentimentAnalyzer
 import se.haleby.reactor.swearwords.SwearWordObfuscator
 import java.time.Duration
+import java.util.*
 import javax.validation.Valid
 import javax.validation.constraints.NotBlank
 
@@ -29,7 +32,10 @@ class ChatController(private val chatRepository: ChatRepository) {
                     .map { ResponseEntity.accepted().build<Unit>() }
 
     @GetMapping
-    fun streamMessages(): Flux<ServerSentEvent<HttpMessageDTO>> {
+    fun streamMessages(): Flux<ServerSentEvent<Any>> {
+
+        val systemSystemSentimentChanges = SystemSentimentAnalyzer.changes().map { it.name }
+
         val loading = chatRepository.subscribeToMessages()
                 .bufferTimeout(1000, Duration.ofMillis(500))
                 .map { list ->
@@ -46,18 +52,24 @@ class ChatController(private val chatRepository: ChatRepository) {
         }
 
         return composed
-                .doOnSubscribe {
-                    log.info("Client connected")
+                .map { message -> message to SentenceSentimentAnalyzer.analyze(message.text) }
+                .doOnNext { (_, analysis) ->
+                    SystemSentimentAnalyzer.addMessageSentimentAnalysis(analysis)
                 }
-                .map(::addSentimentAnalysis)
+                .map { (message, analysis) -> addSentimentAnalysisToMessage(message, analysis) }
                 .map(::obfuscateSwearWords)
                 .map(Message::toDTO)
                 .map { message ->
-                    ServerSentEvent.builder<HttpMessageDTO>()
-                            .id(message.id!!)
-                            .event("message")
-                            .data(message)
-                            .build()
+                    sseEvent("message", message.id!!, message)
+                }
+                .mergeWith(systemSystemSentimentChanges.map {
+                    sseEvent("sentiment", UUID.randomUUID().toString(), it)
+                })
+                .doOnSubscribe {
+                    log.info("Client connected")
+                }
+                .doOnCancel {
+                    log.info("Client disconnected")
                 }
     }
 }
@@ -72,12 +84,17 @@ private fun obfuscateSwearWords(message: Message): Message {
     return message.copy(text = messageWithObfuscatedSwearWords)
 }
 
-private fun addSentimentAnalysis(message: Message): Message {
-    val result = SentenceSentimentAnalyzer.analyze(message.text)
-    val simley = when (result) {
+private fun addSentimentAnalysisToMessage(message: Message, sentimentAnalysis: SentimentAnalysis): Message {
+    val simley = when (sentimentAnalysis) {
         POSITIVE -> "\uD83D\uDE03"
         NEGATIVE -> "\uD83D\uDE41"
         NEUTRAL -> "\uD83D\uDE10"
     }
     return message.copy(text = message.text + " —[$simley]—")
 }
+
+private fun sseEvent(eventType: String, id: String, data: Any) = ServerSentEvent.builder<Any>()
+        .id(id)
+        .event(eventType)
+        .data(data)
+        .build()
