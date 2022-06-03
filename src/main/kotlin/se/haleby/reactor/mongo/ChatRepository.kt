@@ -2,7 +2,9 @@ package se.haleby.reactor.mongo
 
 import org.springframework.data.annotation.TypeAlias
 import org.springframework.data.mongodb.core.CollectionOptions
-import org.springframework.data.mongodb.core.MongoTemplate
+import org.springframework.data.mongodb.core.ReactiveMongoTemplate
+import org.springframework.data.mongodb.core.collectionExists
+import org.springframework.data.mongodb.core.createCollection
 import org.springframework.data.mongodb.core.mapping.Document
 import org.springframework.data.mongodb.repository.Query
 import org.springframework.data.mongodb.repository.ReactiveMongoRepository
@@ -24,13 +26,15 @@ internal interface SpringReactiveChatRepository : ReactiveMongoRepository<MongoM
 }
 
 @Component
-internal class ChatRepositoryImpl(private val repo: SpringReactiveChatRepository, mongo: MongoTemplate) : ChatRepository {
+internal class ChatRepositoryImpl(private val repo: SpringReactiveChatRepository, mongo: ReactiveMongoTemplate) : ChatRepository {
 
     init {
-        if (!mongo.collectionExists(MongoMessageDTO::class.java)) {
-            val options = CollectionOptions.empty().capped().maxDocuments(1000).size(1_000_000)
-            mongo.createCollection(MongoMessageDTO::class.java, options)
-        }
+        mongo.collectionExists<MongoMessageDTO>()
+            .flatMap {
+                val options = CollectionOptions.empty().capped().maxDocuments(1000).size(1_000_000)
+                mongo.createCollection<MongoMessageDTO>(options)
+            }
+            .subscribe()
     }
 
     override fun save(message: Message): Mono<Message> = TODO()
