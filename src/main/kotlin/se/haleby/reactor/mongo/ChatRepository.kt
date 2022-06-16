@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import se.haleby.reactor.Message
+import se.haleby.reactor.logging.loggerFor
 
 interface ChatRepository {
     fun save(message: Message): Mono<Message>
@@ -27,12 +28,19 @@ internal interface SpringReactiveChatRepository : ReactiveMongoRepository<MongoM
 
 @Component
 internal class ChatRepositoryImpl(private val repo: SpringReactiveChatRepository, mongo: ReactiveMongoTemplate) : ChatRepository {
+    private val log = loggerFor<ChatRepositoryImpl>()
 
     init {
         mongo.collectionExists<MongoMessageDTO>()
-            .flatMap {
-                val options = CollectionOptions.empty().capped().maxDocuments(1000).size(1_000_000)
-                mongo.createCollection<MongoMessageDTO>(options)
+            .flatMap { collectionExists ->
+                if (collectionExists) {
+                    log.info("messages collection already exists - won't recreate it")
+                    Mono.empty()
+                } else {
+                    log.info("messages collection doesn't exists - will create it")
+                    val options = CollectionOptions.empty().capped().maxDocuments(1000).size(1_000_000)
+                    mongo.createCollection<MongoMessageDTO>(options).then()
+                }
             }
             .subscribe()
     }
